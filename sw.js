@@ -1,4 +1,4 @@
-const CACHE_NAME = 'sillu-ia-v1';
+const CACHE_NAME = 'sillu-ia-v2';
 // Lista de archivos a "congelar" para que funcionen offline
 const ASSETS = [
   './',
@@ -23,4 +23,5 @@ self.addEventListener('fetch', event => {
       return response || fetch(event.request);
     })
   );
+
 });
