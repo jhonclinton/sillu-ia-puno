@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Sillu-IA: Edge Computing Total</title>
+    <title>Sillu-IA: Edge Computing Pro</title>
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#1a73e8">
 
@@ -14,42 +14,41 @@
     <style>
         :root { --primary: #1a73e8; --bg: #f8f9fa; }
         body { font-family: sans-serif; background: var(--bg); margin: 0; text-align: center; overflow: hidden; }
-        header { background: var(--primary); color: white; padding: 15px; font-weight: bold; }
-        .main-card { width: 92%; max-width: 450px; background: white; margin: 15px auto; border-radius: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); padding: 15px; box-sizing: border-box; }
+        header { background: var(--primary); color: white; padding: 15px; font-weight: bold; font-size: 1.2rem; }
+        .main-card { width: 92%; max-width: 450px; background: white; margin: 10px auto; border-radius: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); padding: 15px; box-sizing: border-box; }
         video { width: 100%; border-radius: 15px; background: #000; aspect-ratio: 1/1; object-fit: cover; }
         
-        .debug-panel { text-align: left; font-size: 0.7rem; background: #f0f0f0; padding: 10px; border-radius: 10px; margin-top: 15px; border: 1px solid #ddd; }
+        .debug-panel { text-align: left; font-size: 0.7rem; background: #f0f0f0; padding: 10px; border-radius: 10px; margin-top: 10px; border: 1px solid #ddd; }
         .class-row { display: flex; align-items: center; margin: 4px 0; }
-        .class-name { width: 45%; font-weight: bold; overflow: hidden; }
-        .bar-bg { flex-grow: 1; background: #ddd; height: 12px; border-radius: 6px; margin-left: 5px; position: relative; }
+        .class-name { width: 45%; font-weight: bold; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .bar-bg { flex-grow: 1; background: #ddd; height: 12px; border-radius: 6px; margin-left: 5px; }
         .bar-fill { height: 100%; background: var(--primary); width: 0%; border-radius: 6px; transition: width 0.1s; }
 
-        #prediction-text { font-size: 1.5rem; color: var(--primary); font-weight: bold; margin: 15px 0; height: 1.6em; }
-        #status { font-size: 0.8rem; padding: 8px; border-radius: 10px; margin-bottom: 10px; font-weight: bold; }
+        #prediction-text { font-size: 1.5rem; color: var(--primary); font-weight: bold; margin: 10px 0; min-height: 1.5em; }
+        #status { font-size: 0.75rem; padding: 6px; border-radius: 8px; margin-bottom: 10px; font-weight: bold; }
         .ready { background: #e8f5e9; color: #2e7d32; }
+        .loading { background: #fff3e0; color: #ef6c00; }
     </style>
 </head>
 <body>
 
-    <header>Sillu-IA: Reconocimiento Puno</header>
+    <header>SILLU-IA: Puno Offline</header>
 
     <div class="main-card">
-        <div id="status">Iniciando sistema Edge...</div>
+        <div id="status" class="loading">Cargando Sistema Neuronal...</div>
         <video id="webcam" autoplay playsinline muted></video>
 
-        <div id="prediction-text">Escaneando...</div>
+        <div id="prediction-text">Buscando...</div>
 
         <div class="debug-panel">
-            <strong>Análisis Neuronal Local:</strong>
+            <strong>Análisis de Confianza:</strong>
             <div id="monitor-clases"></div>
         </div>
     </div>
 
 <script>
     if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('sw.js').then(reg => {
-            console.log("Service Worker v6 registrado correctamente");
-        });
+        navigator.serviceWorker.register('sw.js');
     }
 
     const video = document.getElementById('webcam');
@@ -68,13 +67,12 @@
             });
             video.srcObject = stream;
 
-            statusBox.innerText = "Cargando motor de IA...";
+            statusBox.innerText = "Cargando Inteligencia Base...";
             net = await mobilenet.load();
 
-            statusBox.innerText = "Cargando modelo_puno_final.json...";
-            // Usamos la ruta limpia para que el Service Worker la encuentre en el F5
+            statusBox.innerText = "Importando Conocimiento Local...";
             const response = await fetch('./modelo_puno_final.json');
-            if (!response.ok) throw new Error("Error al leer el archivo JSON");
+            if (!response.ok) throw new Error("JSON no encontrado");
             
             const datasetJson = await response.json();
             const tensors = Object.fromEntries(
@@ -85,7 +83,7 @@
             
             classifier.setClassifierDataset(tensors);
             
-            statusBox.innerText = "SISTEMA OFFLINE LISTO";
+            statusBox.innerText = "SISTEMA OFFLINE ACTIVADO";
             statusBox.className = "ready";
 
             CLASES.forEach((nombre, i) => {
@@ -98,7 +96,7 @@
 
             predict();
         } catch (err) {
-            statusBox.innerText = "ERROR: Verifica conexión una última vez";
+            statusBox.innerText = "Error de inicio. Verifique archivos.";
             console.error(err);
         }
     }
@@ -108,17 +106,19 @@
             if (classifier.getNumClasses() > 0) {
                 const img = tf.browser.fromPixels(video);
                 
-                // Algoritmo de recorte para precisión en celular
-                const h = img.shape[0];
-                const w = img.shape[1];
+                // 1. RECORTE CUADRADO (Center Crop)
+                const [h, w] = [img.shape[0], img.shape[1]];
                 const size = Math.min(h, w);
                 const centerH = (h - size) / 2;
                 const centerW = (w - size) / 2;
-                
                 const cropped = img.slice([centerH, centerW, 0], [size, size, 3]);
-                const resized = tf.image.resizeBilinear(cropped, [224, 224]);
 
-                const activation = net.infer(resized, 'conv_preds');
+                // 2. NORMALIZACIÓN (Iguala calidad de cámara PC y Móvil)
+                const resized = tf.image.resizeBilinear(cropped, [224, 224]);
+                const normalized = resized.toFloat().sub(255 / 2).div(255 / 2);
+
+                // 3. PREDICCIÓN
+                const activation = net.infer(normalized, 'conv_preds');
                 const result = await classifier.predictClass(activation);
 
                 CLASES.forEach((_, i) => {
@@ -127,15 +127,18 @@
                     if (bar) bar.style.width = (conf * 100) + "%";
                 });
 
+                // Umbral de confianza ajustado
                 if (result.confidences[result.label] > 0.45) {
                     predictionLabel.innerText = CLASES[result.label];
                 } else {
                     predictionLabel.innerText = "Escaneando...";
                 }
 
+                // LIBERAR MEMORIA (Crucial para celulares)
                 img.dispose();
                 cropped.dispose();
                 resized.dispose();
+                normalized.dispose();
             }
             await tf.nextFrame();
         }
