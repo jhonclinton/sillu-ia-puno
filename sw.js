@@ -1,5 +1,6 @@
-const CACHE_NAME = 'sillu-ia-v4'; // Nueva versión para forzar limpieza
+const CACHE_NAME = 'sillu-ia-v6-total';
 
+// Archivos locales mínimos para la instalación inicial
 const ASSETS = [
   './',
   './index.html',
@@ -7,37 +8,45 @@ const ASSETS = [
   './libs/tf.min.js',
   './libs/mobilenet.js',
   './libs/knn-classifier.js',
-  './manifest.json',
-  './icono.png'
+  './manifest.json'
 ];
 
-// Instalación: Guardar archivos uno por uno para evitar errores
+// INSTALACIÓN: Guarda los archivos base
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME).then(cache => {
-      console.log('Cacheando archivos para modo offline...');
+      console.log('Cacheando archivos base...');
       return cache.addAll(ASSETS);
     })
   );
   self.skipWaiting();
 });
 
-// Activación: Borrar cachés antiguos automáticamente
+// ACTIVACIÓN: Toma el control de la página inmediatamente
 self.addEventListener('activate', event => {
-  event.waitUntil(
-    caches.keys().then(keys => {
-      return Promise.all(
-        keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key))
-      );
-    })
-  );
+  event.waitUntil(clients.claim());
 });
 
-// Interceptor: Priorizar Caché, luego Red
+// INTERCEPTOR DINÁMICO: La solución al error de red de MobileNet
 self.addEventListener('fetch', event => {
   event.respondWith(
-    caches.match(event.request).then(response => {
-      return response || fetch(event.request);
+    caches.match(event.request, { ignoreSearch: true }).then(cachedResponse => {
+      // 1. Si ya lo tenemos en el disco (incluyendo lo que se guardó de Google), úsalo
+      if (cachedResponse) return cachedResponse;
+
+      // 2. Si no está, búscalo en internet y GUÁRDALO para que el próximo F5 no falle
+      return fetch(event.request).then(networkResponse => {
+        return caches.open(CACHE_NAME).then(cache => {
+          // Solo guardamos si la respuesta es válida (ej. archivos de tfhub.dev)
+          if (networkResponse.status === 200) {
+            cache.put(event.request, networkResponse.clone());
+          }
+          return networkResponse;
+        });
+      }).catch(() => {
+        // Si no hay red y no estaba en caché, fallará (esto solo pasará si nunca entraste con red)
+        return new Response("Error: Recurso no disponible offline.");
+      });
     })
   );
 });
