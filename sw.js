@@ -1,4 +1,4 @@
-const CACHE_NAME = 'sillu-ia-v6-total';
+const CACHE_NAME = 'sillu-ia-v7-total';
 
 // Archivos locales mínimos para la instalación inicial
 const ASSETS = [
@@ -50,3 +50,4 @@ self.addEventListener('fetch', event => {
     })
   );
 });
+
