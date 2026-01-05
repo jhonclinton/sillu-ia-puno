@@ -4,25 +4,32 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Sillu-IA: Edge Computing v2</title>
+    
     <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#1a73e8">
+
     <script src="libs/tf.min.js"></script>
     <script src="libs/mobilenet.js"></script>
     <script src="libs/knn-classifier.js"></script>
+
     <style>
         :root { --primary: #1a73e8; --bg: #f8f9fa; }
         body { font-family: sans-serif; background: var(--bg); margin: 0; text-align: center; }
         header { background: var(--primary); color: white; padding: 15px; font-weight: bold; }
-        .main-card { width: 92%; max-width: 450px; background: white; margin: 15px auto; border-radius: 20px; shadow: 0 4px 15px rgba(0,0,0,0.1); padding: 15px; box-sizing: border-box; }
-        video { width: 100%; border-radius: 15px; background: #000; }
+        .main-card { width: 92%; max-width: 450px; background: white; margin: 15px auto; border-radius: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); padding: 15px; box-sizing: border-box; }
+        video { width: 100%; border-radius: 15px; background: #000; aspect-ratio: 1/1; object-fit: cover; }
         
-        /* Monitor de Clases para Tesis */
-        .debug-panel { text-align: left; font-size: 0.7rem; background: #eee; padding: 10px; border-radius: 10px; margin-top: 10px; }
-        .class-row { display: flex; justify-content: space-between; margin: 2px 0; }
-        .bar-bg { width: 60%; background: #ddd; height: 8px; border-radius: 4px; overflow: hidden; }
-        .bar-fill { height: 100%; background: var(--primary); width: 0%; transition: width 0.2s; }
+        /* Panel de Monitorización para tu Tesis */
+        .debug-panel { text-align: left; font-size: 0.7rem; background: #f0f0f0; padding: 10px; border-radius: 10px; margin-top: 15px; border: 1px solid #ddd; }
+        .class-row { display: flex; align-items: center; margin: 4px 0; }
+        .class-name { width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .bar-bg { flex-grow: 1; background: #ddd; height: 10px; border-radius: 5px; margin-left: 5px; position: relative; }
+        .bar-fill { height: 100%; background: var(--primary); width: 0%; border-radius: 5px; transition: width 0.1s; }
 
-        #prediction-text { font-size: 1.5rem; color: var(--primary); font-weight: bold; margin: 10px 0; }
-        #status { font-size: 0.8rem; color: #2e7d32; font-weight: bold; margin-bottom: 10px; }
+        #prediction-text { font-size: 1.4rem; color: var(--primary); font-weight: bold; margin: 15px 0; min-height: 1.6em; }
+        #status { font-size: 0.8rem; padding: 8px; border-radius: 10px; margin-bottom: 10px; font-weight: bold; }
+        .loading { background: #fff3e0; color: #ef6c00; }
+        .ready { background: #e8f5e9; color: #2e7d32; }
     </style>
 </head>
 <body>
@@ -30,24 +37,25 @@
     <header>Sillu-IA: Reconocimiento Puno</header>
 
     <div class="main-card">
-        <div id="status">Iniciando...</div>
+        <div id="status" class="loading">Iniciando motor neuronal...</div>
         <video id="webcam" autoplay playsinline muted></video>
 
         <div id="prediction-text">Escaneando...</div>
 
-        <div class="debug-panel" id="debug-panel">
-            <strong>Confianza por clase:</strong>
+        <div class="debug-panel">
+            <strong style="display:block; margin-bottom:5px;">Análisis en Tiempo Real (Edge):</strong>
             <div id="monitor-clases"></div>
         </div>
         
         <div style="font-size: 0.6rem; color: #aaa; margin-top: 10px;">
-            Si no cambia, borra el caché de Chrome y recarga.
+            Si el error persiste, verifica que el archivo JSON esté en la raíz de GitHub.
         </div>
     </div>
 
 <script>
+    // Registro del Service Worker
     if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('sw.js');
+        navigator.serviceWorker.register('sw.js').catch(console.error);
     }
 
     const video = document.getElementById('webcam');
@@ -58,20 +66,33 @@
     let net;
     const classifier = knnClassifier.create();
     
-    // IMPORTANTE: El mismo orden de tu entrenamiento
+    // El orden exacto de tus clases
     const CLASES = ['Chullpas Sillustani', 'Inca Uyo', 'Aramu Muru', 'Catedral Puno', 'Arco Deustua'];
 
-    async function setup() {
+    async function setupApp() {
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+            // 1. Iniciar Cámara
+            const stream = await navigator.mediaDevices.getUserMedia({ 
+                video: { facingMode: "environment" } 
+            });
             video.srcObject = stream;
 
+            // 2. Cargar MobileNet localmente
+            statusBox.innerText = "Cargando MobileNet...";
             net = await mobilenet.load();
+
+            // 3. Cargar JSON con Bypass de Caché
+            statusBox.innerText = "Buscando modelo_puno_final.json...";
             
-            // Forzar carga fresca del JSON (agregando un número aleatorio para evitar caché)
-            const response = await fetch('modelo_puno_final.json?v=' + Math.random());
+            // Agregamos un número aleatorio para que el navegador NO use el archivo viejo
+            const cacheBypass = "?v=" + new Date().getTime();
+            const response = await fetch('modelo_puno_final.json' + cacheBypass);
+            
+            if (!response.ok) throw new Error("Archivo JSON no encontrado en el servidor");
+            
             const datasetJson = await response.json();
             
+            // Rehidratar tensores
             const tensors = Object.fromEntries(
                 Object.entries(datasetJson).map(([label, data]) => [
                     label, 
@@ -80,49 +101,57 @@
             );
             
             classifier.setClassifierDataset(tensors);
-            statusBox.innerText = "SISTEMA LISTO (EDGE MODE)";
             
-            // Crear barras de monitor
+            statusBox.innerText = "SISTEMA OFFLINE LISTO";
+            statusBox.className = "status-badge ready";
+
+            // Crear las barritas de monitoreo
             CLASES.forEach((nombre, i) => {
                 monitor.innerHTML += `
                     <div class="class-row">
-                        <span>${nombre}</span>
+                        <span class="class-name">${nombre}</span>
                         <div class="bar-bg"><div id="bar-${i}" class="bar-fill"></div></div>
                     </div>`;
             });
 
-            run();
-        } catch (e) {
+            predict();
+        } catch (err) {
             statusBox.innerText = "Error de carga. ¿Subiste el JSON?";
-            console.error(e);
+            statusBox.style.background = "#ffebee";
+            statusBox.style.color = "#c62828";
+            console.error("Detalle del error:", err);
         }
     }
 
-    async function run() {
+    async function predict() {
         while (true) {
-            const img = tf.browser.fromPixels(video);
-            const activation = net.infer(img, 'conv_preds');
-            const result = await classifier.predictClass(activation);
+            if (classifier.getNumClasses() > 0) {
+                const img = tf.browser.fromPixels(video);
+                const activation = net.infer(img, 'conv_preds');
+                const result = await classifier.predictClass(activation);
 
-            // Actualizar monitor visual
-            CLASES.forEach((_, i) => {
-                const conf = result.confidences[i] || 0;
-                document.getElementById(`bar-${i}`).style.width = (conf * 100) + "%";
-            });
+                // Actualizar barras del monitor
+                CLASES.forEach((_, i) => {
+                    const conf = result.confidences[i] || 0;
+                    const bar = document.getElementById(`bar-${i}`);
+                    if (bar) bar.style.width = (conf * 100) + "%";
+                });
 
-            // Lógica de decisión: Bajamos el umbral a 0.45 para Android
-            if (result.confidences[result.label] > 0.45) {
-                predictionLabel.innerText = CLASES[result.label];
-            } else {
-                predictionLabel.innerText = "Buscando...";
+                // Umbral de decisión (0.45 para mayor sensibilidad en móvil)
+                if (result.confidences[result.label] > 0.45) {
+                    predictionLabel.innerText = CLASES[result.label];
+                } else {
+                    predictionLabel.innerText = "Escaneando...";
+                }
+
+                img.dispose();
             }
-
-            img.dispose();
             await tf.nextFrame();
         }
     }
 
-    setup();
+    setupApp();
 </script>
 </body>
 </html>
+
