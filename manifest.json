@@ -1,0 +1,18 @@
+{
+    "short_name": "SilluIA",
+    "name": "Sillu-IA: Patrimonio Puno",
+    "icons": [
+      {
+        "src": "icono.png",
+        "sizes": "512x512",
+        "type": "image/png",
+        "purpose": "any maskable"
+      }
+    ],
+    "start_url": "./index.html",
+    "display": "standalone",
+    "theme_color": "#1a73e8",
+    "background_color": "#ffffff",
+    "orientation": "portrait",
+    "scope": "./"
+  }
