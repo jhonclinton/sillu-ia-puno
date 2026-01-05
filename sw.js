@@ -1,6 +1,5 @@
-const CACHE_NAME = 'sillu-ia-v3';
+const CACHE_NAME = 'sillu-ia-v4'; // Nueva versión para forzar limpieza
 
-// Lista de archivos locales para que la App funcione en el campo (Puno)
 const ASSETS = [
   './',
   './index.html',
@@ -8,22 +7,22 @@ const ASSETS = [
   './libs/tf.min.js',
   './libs/mobilenet.js',
   './libs/knn-classifier.js',
-  './manifest.json'
+  './manifest.json',
+  './icono.png'
 ];
 
-// INSTALACIÓN: Aquí es donde se guardan los archivos en el disco del celular
+// Instalación: Guardar archivos uno por uno para evitar errores
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME).then(cache => {
-      console.log('Guardando archivos en caché...');
+      console.log('Cacheando archivos para modo offline...');
       return cache.addAll(ASSETS);
     })
   );
-  // Fuerza al Service Worker nuevo a tomar el control inmediatamente
   self.skipWaiting();
 });
 
-// ACTIVACIÓN: Limpia cachés antiguos si cambias de v2 a v3
+// Activación: Borrar cachés antiguos automáticamente
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys().then(keys => {
@@ -34,11 +33,10 @@ self.addEventListener('activate', event => {
   );
 });
 
-// INTERCEPTOR: Responde desde el caché, y si no está, busca en internet
+// Interceptor: Priorizar Caché, luego Red
 self.addEventListener('fetch', event => {
   event.respondWith(
     caches.match(event.request).then(response => {
-      // Si el archivo está en caché, lo devuelve. Si no, lo pide a la red.
       return response || fetch(event.request);
     })
   );
