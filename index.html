@@ -3,8 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Sillu-IA: Edge Computing Puno</title>
-    
+    <title>Sillu-IA: Edge Computing Total</title>
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#1a73e8">
 
@@ -14,7 +13,7 @@
 
     <style>
         :root { --primary: #1a73e8; --bg: #f8f9fa; }
-        body { font-family: sans-serif; background: var(--bg); margin: 0; text-align: center; overflow-x: hidden; }
+        body { font-family: sans-serif; background: var(--bg); margin: 0; text-align: center; overflow: hidden; }
         header { background: var(--primary); color: white; padding: 15px; font-weight: bold; }
         .main-card { width: 92%; max-width: 450px; background: white; margin: 15px auto; border-radius: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); padding: 15px; box-sizing: border-box; }
         video { width: 100%; border-radius: 15px; background: #000; aspect-ratio: 1/1; object-fit: cover; }
@@ -27,7 +26,6 @@
 
         #prediction-text { font-size: 1.5rem; color: var(--primary); font-weight: bold; margin: 15px 0; height: 1.6em; }
         #status { font-size: 0.8rem; padding: 8px; border-radius: 10px; margin-bottom: 10px; font-weight: bold; }
-        .loading { background: #fff3e0; color: #ef6c00; }
         .ready { background: #e8f5e9; color: #2e7d32; }
     </style>
 </head>
@@ -36,20 +34,22 @@
     <header>Sillu-IA: Reconocimiento Puno</header>
 
     <div class="main-card">
-        <div id="status" class="loading">Iniciando sistema...</div>
+        <div id="status">Iniciando sistema Edge...</div>
         <video id="webcam" autoplay playsinline muted></video>
 
         <div id="prediction-text">Escaneando...</div>
 
         <div class="debug-panel">
-            <strong style="display:block; margin-bottom:5px;">Confianza por clase (Edge Mode):</strong>
+            <strong>Análisis Neuronal Local:</strong>
             <div id="monitor-clases"></div>
         </div>
     </div>
 
 <script>
     if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('sw.js').then(() => console.log("SW v4 Activo"));
+        navigator.serviceWorker.register('sw.js').then(reg => {
+            console.log("Service Worker v6 registrado correctamente");
+        });
     }
 
     const video = document.getElementById('webcam');
@@ -64,17 +64,17 @@
     async function setupApp() {
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ 
-                video: { facingMode: "environment", width: 640, height: 640 } 
+                video: { facingMode: "environment" } 
             });
             video.srcObject = stream;
 
-            statusBox.innerText = "Cargando Red Neuronal...";
+            statusBox.innerText = "Cargando motor de IA...";
             net = await mobilenet.load();
 
-            statusBox.innerText = "Descargando conocimiento local...";
-            const cacheBypass = "?v=" + new Date().getTime();
-            const response = await fetch('modelo_puno_final.json' + cacheBypass);
-            if (!response.ok) throw new Error("JSON no encontrado");
+            statusBox.innerText = "Cargando modelo_puno_final.json...";
+            // Usamos la ruta limpia para que el Service Worker la encuentre en el F5
+            const response = await fetch('./modelo_puno_final.json');
+            if (!response.ok) throw new Error("Error al leer el archivo JSON");
             
             const datasetJson = await response.json();
             const tensors = Object.fromEntries(
@@ -98,8 +98,7 @@
 
             predict();
         } catch (err) {
-            statusBox.innerText = "ERROR: No se pudo cargar el modelo";
-            statusBox.style.background = "#ffebee";
+            statusBox.innerText = "ERROR: Verifica conexión una última vez";
             console.error(err);
         }
     }
@@ -109,7 +108,7 @@
             if (classifier.getNumClasses() > 0) {
                 const img = tf.browser.fromPixels(video);
                 
-                // --- ALGORITMO DE RECORTE (CROPPING) PARA PRECISIÓN MÓVIL ---
+                // Algoritmo de recorte para precisión en celular
                 const h = img.shape[0];
                 const w = img.shape[1];
                 const size = Math.min(h, w);
@@ -118,7 +117,6 @@
                 
                 const cropped = img.slice([centerH, centerW, 0], [size, size, 3]);
                 const resized = tf.image.resizeBilinear(cropped, [224, 224]);
-                // -----------------------------------------------------------
 
                 const activation = net.infer(resized, 'conv_preds');
                 const result = await classifier.predictClass(activation);
